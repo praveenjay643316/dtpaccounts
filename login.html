@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
+        </script>
+    <title>Login - detials</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: url(https://picsum.photos/2500/1500?image=1041);
+            background-size: cover;
+            font-family: sans-serif;
+        }
+
+        .box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 25rem;
+            padding: 2.5rem;
+            box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border: 5px solid rgb(39, 179, 226);
+            /* background: rgba(0, 0, 0, 0.6); */
+            background: rgb(255, 252, 252);
+            border-radius: 0.625rem;
+            font-weight: bold;
+        }
+
+        .box h2 {
+            margin: 0 0 1.875rem;
+            padding: 0;
+            color: black;
+            text-align: center;
+        }
+
+        .box .inputBox {
+            position: relative;
+        }
+
+        .box .inputBox input {
+            width: 100%;
+            padding: 0.625rem 0;
+            font-size: 1rem;
+            /* color: #fff; */
+            color: black;
+            letter-spacing: 0.062rem;
+            margin-bottom: 1.875rem;
+            border: none;
+            /* border-bottom: 0.065rem solid #fff; */
+            border-bottom: 0.065rem solid black;
+            outline: none;
+            background: transparent;
+        }
+
+        .box .inputBox label {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 0.625rem 0;
+            font-size: 1rem;
+            /* color: #fff; */
+            color: black;
+            pointer-events: none;
+            transition: 0.5s;
+        }
+
+        .box .inputBox input:focus~label,
+        .box .inputBox input:valid~label,
+        .box .inputBox input:not([value=""])~label {
+            top: -1.125rem;
+            left: 0;
+            color: #03a9f4;
+            font-size: 0.75rem;
+        }
+
+        .box input[type="submit"] {
+            border: none;
+            outline: none;
+            /* color: #fff; */
+            color: black;
+            background-color: #03a9f4;
+            padding: 0.625rem 1.25rem;
+            cursor: pointer;
+            border-radius: 0.312rem;
+            font-size: 1rem;
+        }
+
+        .box input[type="submit"]:hover {
+            background-color: #1cb1f5;
+        }
+
+        .close-icon {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-icon:hover {
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="box">
+        <span class="close-icon"><i class="fa fa-times"></i></span>
+        <h2>Login</h2>
+        <form>
+            <div class="inputBox">
+                <input type="email" name="email" required onkeyup="this.setAttribute('value', this.value);" value="">
+                <label><i class="fa fa-user"></i> Username</label>
+            </div>
+            <div class="inputBox">
+                <input type="password" name="password" required value=""
+                    onkeyup="this.setAttribute('value', this.value);" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
+                    title="Must contain at least one number and one uppercase and lowercase letter, and at least 8 or more characters">
+                <label><i class="fa fa-lock"></i> Password</label>
+            </div>
+            <div class="inputBox">
+                <input type="password" name="password" required value=""
+                    onkeyup="this.setAttribute('value', this.value);" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,}"
+                    title="Must contain at least one number and one uppercase and lowercase letter, and at least 8 or more characters">
+                <label><i class="fa fa-refresh"></i> Enter Captcha</label>
+                <!-- <img src="captcha.php" alt="CAPTCHA"> -->
+            </div>
+            <button class="btn btn-info" input type="submit" name="sign-in" value="Sign In"
+                style="color:white;margin-left:100px">Sign In
+                <i class="fa fa-sign-in"></i> </button>
+        </form>
+    </div>
+</body>
+
+</html>

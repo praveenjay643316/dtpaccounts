@@ -1,0 +1,68 @@
+<?php
+require_once __DIR__ . '/../config/configPublic.php';
+
+class preSet_404
+{
+    use siteInfo;
+    use CommonFunctions;
+}
+$preSet_404 = new preSet_404();
+
+?>
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 Page Not Found</title>
+    <style>
+        html {
+            font-family: Arial, sans-serif;
+            color: #000;
+            font-size: 16px;
+            font-weight: 400;
+        }
+
+        main {
+            margin: 5rem 0 0 5rem;
+        }
+
+        h1,
+        p {
+            margin-top: 0;
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            font-weight: 700;
+            font-size: 4.5rem;
+        }
+
+        p {
+            color: #7d7d7d;
+            font-size: 1.75rem;
+        }
+
+        @media screen and (max-width: 768px) {
+            html {
+                font-size: 12px;
+            }
+
+            main {
+                margin: 3rem 0 0 3rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <h1>404 Page Not Found</h1>
+        <p>
+        Page Not Found , <a href="<?php echo htmlentities($preSet_404->siteData()->website_url); ?>">Click here to Home</a>  
+        </p>
+    </main>
+</body>
+
+</html>

@@ -1,0 +1,1716 @@
+<?php
+error_reporting(E_ALL);
+ini_set("display_errors", 1);
+require_once  '../../config/config.php';
+require_once '../../library/account_head_balance.php';
+
+class AdjustBankReceiptVoucher  extends ConfigClass
+{
+
+    public $page_token = "Bank_Receipt_Voucher";
+    public function __construct()
+    {
+        if (!isset($this->db)) {
+        }
+    }
+
+    public function main_content($post_data_array = array())
+    {
+        $site_data = $this->siteData();
+
+        if (!isset($post_data_array["edit_id"]) && !isset($post_data_array["del_id"])) {
+            $post_data_array["mode_name"] = "Save";
+            $post_data_array["mode_class"] = "btn-success";
+        } else if (isset($post_data_array["edit_id"])) {
+            $post_data_array["mode_name"] = "Update";
+            $post_data_array["mode_class"] = "btn-warning";
+        } else if (isset($post_data_array["del_id"])) {
+            $post_data_array["mode_name"] = "Delete";
+            $post_data_array["mode_class"] = "btn-danger";
+        }
+       
+        ob_start();
+        // #############
+
+        // PAGE CONTENT START
+
+        // #############
+        ?>
+        <input type="hidden" id="page_lable_id" name="page_lable_id" value="38" />
+        <?php
+        $state_code = $this->getCurrentStateCode();
+        $dcode = $this->getCurrentDistrictCode();
+        $lbcode = $this->getCurrentLocalBodyCode();
+        $lang_code_2d = $this->getCurrentUserLanguage2D();
+        $fin_year = $this->getFinYear();
+        //$fin_year='2025-2026';
+        $sel_date_qry="select TO_CHAR(brv_date, 'DD-MM-YYYY') as brv_date,  TO_CHAR(triplicate_collection_date, 'DD-MM-YYYY') as triplicate_collection_date from accounts_master.t_bank_receipt_voucher where dcode=:dcode and lbcode=:lbcode and del_flag is null and fin_year=:fin_year order by brv_id desc limit 1;";
+		$sel_date_qry_res=$this->prepare($sel_date_qry, array(":dcode"=>$dcode, ":lbcode"=>$lbcode, ":fin_year" =>$fin_year),4);
+       
+        if(isset($sel_date_qry_res['brv_date']) && $sel_date_qry_res['brv_date'] != ''){
+            $challan_date=$sel_date_qry_res['triplicate_collection_date'];
+            $brv_date= $sel_date_qry_res['brv_date'];
+        }else{
+            $sel_date_qry="select * from public.sp_date_from_fin_year(:fin_year);";
+            $sel_date_qry_res=$this->prepare($sel_date_qry, array(":fin_year" =>$fin_year),4);
+            $challan_date=$brv_date= json_decode($sel_date_qry_res['sp_date_from_fin_year'])->from_date;
+        }
+        ?>
+    <script type="text/javascript">
+    $(document).ready(function() {
+        $('#credit_bank_code option[value="865"]').show();
+                                    $('#credit_bank_code').val(865);//id of account head no 3059 in local db
+                                    $('#credit_bank_code').prop('disabled', true);
+    $(document).on('change', '#debit_bank_code', function() {
+        if ($("#date").val() == '') {
+            alert('Select BRV Date');
+            return false;
+        }
+        if ($("#chl_date").val() == '') {
+            alert('Select Chalan Collection Date');
+            return false;
+        }
+        if ($("#debit_bank_code").val() != '') {
+            var bank_code = $("#debit_bank_code").val();
+        } else {
+            alert("Select Bank Code");
+            $("#debit_bank_head").val('');
+        }
+        if (bank_code != '') {
+            $.ajax({
+                url: "Bank_Receipt_Voucher.php",
+                type: "post",
+                data: {
+                    "bank_code": btoa(bank_code),
+                    "cmd": btoa(2)
+                },
+                success: function(data) {
+                    if (data != '') {
+                        $('#debit_bank_head').val(data.DATA);
+                    }
+                },
+                dataType: 'json'
+            });
+        } else {
+            alert('Select Bank Code');
+        }
+    });
+    $(document).on('click','#btn_debit_edit', function() {
+        var id = $(this).parent().parent().find('.bank_id').val();
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            data: {
+                "account_type": btoa(1),
+                "pay_type":btoa("debit"),
+                "id": btoa(id),
+                "cmd": btoa(4)
+            },
+            success: function(data) {
+                if (data != '') {
+                    var Result_Data = JSON.parse(data);
+                    $("#btn_debit_add").val("Edit Debit");
+                    $('#debit_bank_code').val(Result_Data['acc_code']);
+                    //$('#debit_bank_head').val(Result_Data['bank_head']);
+                    $('#debit_amount').val(Result_Data['debit_amount']);
+                    $('#debit_delete_id').val('');
+                    $('#debit_edit_id').val(Result_Data['brv_breakup_id']);
+                }
+            },
+            dataType: 'html'
+        });
+    });
+    $(document).on('click', '#btn_debit_delete', function() {
+        var id = $(this).parent().parent().find('.bank_id').val();
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            data: {
+                "pay_type":btoa('debit'),
+                "account_type": btoa(1),
+                "id": btoa(id),
+                "cmd": btoa(5)
+            },
+            success: function(data) {
+                if (data != '') {
+                    var Result_Data = JSON.parse(data);
+                    $("#btn_debit_add").val('Delete Debit');
+                    $('#debit_bank_code').val(Result_Data['acc_code']);
+                    //$('#debit_bank_head').val(Result_Data['bank_head']);
+                    $('#debit_amount').val(Result_Data['debit_amount']);
+                    $('#debit_delete_id').val(Result_Data['brv_breakup_id']);
+                    $('#debit_edit_id').val('');
+                }
+            },
+
+            
+            dataType: 'html'
+        });
+    });
+    $(document).on('click', '#btn_credit_edit', function() {
+        var id = $(this).parent().parent().find('.bank_id').val();
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            data: {
+                "pay_type":btoa("credit"),
+                "account_type": btoa(2),
+                "id": btoa(id),
+                "cmd": btoa(4)
+            },
+            success: function(data) {
+                if (data != '') {
+                    var Result_Data = JSON.parse(data);
+                    $("#btn_credit_add").val("Edit Credit");
+                    $('#acc_code').val(Result_Data['acc_code']);
+                    //$('#acc_head').html(Result_Data['acc_head']);
+                    $('#credit_amount').val(Result_Data['credit_amount']);
+                    $('#credit_delete_id').val('');
+                    $('#credit_edit_id').val(Result_Data['brv_breakup_id']);
+
+                }
+            },
+            dataType: 'html'
+        });
+    });
+    $(document).on('click', '#btn_credit_delete', function() {
+        var id = $(this).parent().parent().find('.bank_id').val();
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            data: {
+                "pay_type":btoa('credit'),
+                "account_type": btoa(2),
+                "id": btoa(id),
+                "cmd": btoa(5)
+            },
+            success: function(data) {
+
+                if (data != '') {
+                    var Result_Data = JSON.parse(data);
+                    $("#btn_credit_add").val("Delete Credit");
+                    $('#acc_code').val(Result_Data['acc_code']);
+                    $('#acc_head').html(Result_Data['acc_head']);
+                    $('#credit_amount').val(Result_Data['credit_amount']);
+                    $('#credit_delete_id').val(Result_Data['brv_breakup_id']);
+                    $('#credit_edit_id').val('');
+                }
+            },
+            error:function(xhr,error,status)
+            {
+                console.log(error);
+                console.log(status);
+            },
+            dataType: 'html'
+        });
+    });
+    $(document).on('click', '#btn_debit_add', function() {
+        try {
+            if ($("#brv_serial_no").val().length == '') {
+                throw {
+                    msg: "Missing Serial Number",
+                    foc: "#brv_serial_no"
+                }
+            } else {
+                var brv_serial_no = $("#brv_serial_no").val();
+            }
+            if ($("#chl_date").val().length == '') {
+                throw {
+                    msg: "Select Chalan Collection Date",
+                    foc: "#chl_date"
+                }
+            } else {
+                var total_amount = $("#collection_amount").val();
+            }
+            if ($("#debit_bank_code").val().length == '') {
+                throw {
+                    msg: "Select Bank Code",
+                    foc: "#debit_bank_code"
+                }
+            } else {
+                var acc_code = $("#debit_bank_code").val();
+            }
+            // if ($("#debit_bank_head").val().length == '') {
+            //     throw {
+            //         msg: "Enter Bank Head",
+            //         foc: "#debit_bank_head"
+            //     }
+            // } else {
+            //     var bank_head = $("#debit_bank_head").val();
+            
+            if ($("#debit_amount").val().length == '') {
+                throw {
+                    msg: "Enter Debit Amount",
+                    foc: "#bank_head"
+                }
+            } else {
+                var amount = $("#debit_amount").val();
+            }
+        } catch (e) {
+            alert(e.msg);
+            $('#' + Current_Field_id).show();
+            $(e.foc).focus();
+            return false;
+        }
+        var edit_id = $("#debit_edit_id").val();
+        var delete_id = $("#debit_delete_id").val();
+        var acc_head=$('#debit_bank_code option:selected').data('name');
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            data: {
+                "collection_amount": btoa(total_amount),
+                "brv_serial_no": btoa(brv_serial_no),
+                "acc_code": btoa(acc_code),
+                "acc_head": btoa(acc_head),
+                "amount": btoa(amount),
+                "edit_id": btoa(edit_id),
+                "delete_id": btoa(delete_id),
+                "cmd": btoa(3)
+            },
+            success: function(data) {
+                if (data != '') {
+                    var Result_Data = JSON.parse(data);
+                    if (Result_Data['STATUS'] == 'SUCCESS') {
+                        let message = "Successfully Added";
+                        if (delete_id != '') {
+                            message = "Successfully Deleted";
+                        } else if (edit_id != '') {
+                            message = "Successfully Changed";
+                        }
+                        alert(message);
+                        //delete_id!=''?$("#debit_table_result tbody").html(''):
+                        $("#debit_table_result tbody").html(Result_Data[ 'debit_data_table']);
+                        $('#debit_total_amount').val(Result_Data['debit_amount']);
+                        $('#span_debit_total_amount').html(Result_Data['debit_amount']);
+                        $('#debit_delete_id').val('');
+                        $('#debit_edit_id').val('');
+                        $('#debit_bank_code').val('');
+                        $('#debit_bank_head').val('');
+                        $('#debit_amount').val('');
+                        $("#btn_debit_add").val('Add Debit');
+                    } else {
+                        alert(Result_Data['MESSAGE']);
+                    }
+                }
+            },
+            dataType: 'html'
+        });
+    });
+    $(document).on('click', '#btn_credit_add', function() {
+        try {
+            if ($("#brv_serial_no").val().length == '') {
+                throw {
+                    msg: "Missing Serial Number",
+                    foc: "#brv_serial_no"
+                }
+            } else {
+                var brv_serial_no = $("#brv_serial_no").val();
+            }
+            if ($("#chl_date").val().length == '') {
+                throw {
+                    msg: "Select Chalan Collection Date",
+                    foc: "#chl_date"
+                }
+            } else {
+                var total_amount = $("#collection_amount").val();
+            }
+            if ($("#credit_bank_code").val().length == '') {
+                throw {
+                    msg: "Select Account Code",
+                    foc: "#credit_bank_code"
+                }
+            } else {
+                var acc_code = $("#credit_bank_code").val();
+            }
+            if ($("#credit_amount").val().length == '') {
+                throw {
+                    msg: "Enter Credit Amount",
+                    foc: "#credit_amount"
+                }
+            } else {
+                var amount = $("#credit_amount").val();
+            }
+        } catch (e) {
+            alert(e.msg);
+            $('#' + Current_Field_id).show();
+            $(e.foc).focus();
+            return false;
+        }
+        var edit_id = $("#credit_edit_id").val();
+        var delete_id = $("#credit_delete_id").val();
+        var acc_head = $("#credit_bank_code option:selected").data('name');
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            data: {
+                "collection_amount": btoa(total_amount),
+                "brv_serial_no": btoa(brv_serial_no),
+                "acc_code": btoa(acc_code),
+                "acc_head": btoa(acc_head),
+                "amount": btoa(amount),
+                "edit_id": btoa(edit_id),
+                "delete_id": btoa(delete_id),
+                "cmd": btoa(6)
+            },
+            success: function(data) {
+                if (data != '') {
+                    var Result_Data = JSON.parse(data);
+                    if (Result_Data['STATUS'] == 'SUCCESS') {
+                        let message = "Successfully Added";
+                        if (delete_id != '') {
+                            message = "Successfully Deleted";
+                        } else if (edit_id != '') {
+                            message = "Successfully Changed";
+                        }
+                        alert(message);
+                        $("#credit_table_result tbody").html(Result_Data[
+                            'credit_data_table']);
+                        $('#credit_total_amount').val(Result_Data['credit_amount']);
+                        $('#span_credit_total_amount').html(Result_Data['credit_amount']);
+                        $('#credit_delete_id').val('');
+                        $('#credit_edit_id').val('');
+                        $('#acc_code').val('');
+                        $('#acc_head').html('');
+                        $('#credit_amount').val('');
+                        $("#btn_credit_add").val('Add Credit');
+                    } else {
+                        alert(Result_Data['MESSAGE']);
+                    }
+                }
+            },
+            dataType: 'html'
+        });
+    });
+    $(document).on('change', '#acc_code', function() {
+        if ($("#date").val() == '') {
+            alert('Select Date');
+            return false;
+        }
+        if ($("#chl_date").val() == '') {
+            alert('Select Chalan Collection Date');
+            return false;
+        }
+        if ($("#acc_code").val() != '') {
+            var acc_code = $("#acc_code").val();
+        } else {
+            alert("Select Account Code");
+            $("#acc_head").html('');
+
+        }
+        if (acc_code != '') {
+            var acc_desc = $('#acc_code option:selected').data('desc');
+            $("#acc_head").html(acc_desc);
+        }
+    });
+    $('#date').datepicker({
+        uiLibrary: 'bootstrap4',
+        format: 'dd-mm-yyyy',
+        minDate: new Date('<?php echo date("Y-m-d", strtotime($brv_date)); ?>'),
+        maxDate: new Date()
+    }).on('change', function(e) {
+        const date = $(this).val();
+    });
+    $('#chl_date').datepicker({
+        uiLibrary: 'bootstrap4',
+        format: 'dd-mm-yyyy',
+        minDate: new Date('<?php echo date("Y-m-d", strtotime($challan_date)); ?>'),
+        maxDate: new Date()
+    }).on('change', function(e) {
+        let chalan_date_parts=$("#chl_date").val().split('-');
+        let chalan_date=chalan_date_parts[2]+'-'+chalan_date_parts[1]+'-'+chalan_date_parts[0];
+        let formatted_chalan_date=new Date(chalan_date);
+        if ($("#date").val() != '') {
+            let brv_date_parts=$("#date").val().split('-');
+            let brv_date=brv_date_parts[2]+'-'+brv_date_parts[1]+'-'+brv_date_parts[0];
+            let formatted_brv_date=new Date(brv_date);
+            if (formatted_chalan_date > formatted_brv_date) {
+                alert('Chalan Collection Date Must Be Less Than BRV Date.');
+                $(this).val('');
+                return false;
+            }
+        } else {
+            $(this).val('');
+            alert('Select BRV Date');
+            return false;
+        }
+        $.ajax({
+            url: "Bank_Receipt_Voucher.php",
+            type: "post",
+            dataType:'json',
+            data: {
+                "chl_date": btoa(chalan_date),
+                "cmd": btoa(7),
+            },
+            success: function(response) {
+                if(response.total_amount==='' || response.total_amount==null)
+                {
+                    alert("There is no collection on this date");
+                     $('#chl_date').val('');
+                     $('#span_collection_amount').html('');
+                     $('collection_amount').val('');
+                     return false;
+
+                }
+                else{                   
+                    $('#collection_amount').val(response.total_amount);   
+                    $('#span_credit_total_amount').html(response.total_amount); 
+                    $('#credit_total_amount').val(response.total_amount); 
+                    $('#credit_amount').val(response.total_amount).prop('disabled', true);     
+                    $('#chalan_nos').val(JSON.stringify(response.tc_serial_no));              
+                    $('#span_collection_amount').html(
+        response.total_amount
+          ? `${response.total_amount}
+             <i class="fa fa-info-circle ms-1" role="button" title="More information"
+   data-bs-toggle="modal" data-bs-target="#infoModal"></i>
+`
+          : ''
+      );
+              $('#infoModal').remove();
+
+      $('body').append(response.html);
+                }
+            }
+        });
+    });;
+    // $('#cheque_date').datepicker({
+    //     uiLibrary: 'bootstrap4',
+    //     format: 'dd-mm-yyyy',
+    //     //minDate:  '12-12-2014',
+    //     minDate: new Date('01-01-1970'),
+    //     //maxDate: new Date() 
+    //     maxDate: new Date()
+    // });
+    // $('#dd_date').datepicker({
+    //     uiLibrary: 'bootstrap4',
+    //     format: 'dd-mm-yyyy',
+    //     //minDate:  '12-12-2014',
+    //     minDate: new Date('01-01-1970'),
+    //     //maxDate: new Date() 
+    //     maxDate: new Date()
+    // });
+    // $('#ecs_date').datepicker({
+    //     uiLibrary: 'bootstrap4',
+    //     format: 'dd-mm-yyyy',
+    //     //minDate:  '12-12-2014',
+    //     minDate: new Date('01-01-1970'),
+    //     //maxDate: new Date() 
+    //     maxDate: new Date()
+    // });
+    // $('#pay_mode').change(function() {
+    //     if ($(this).val() == 'Cheque') {
+    //         $('.pay_mode_dd').hide();
+    //         $('.pay_mode_ecs').hide();
+    //         $('.pay_mode_cheque').show();
+    //         $('.bank_name_row').show();
+    //     } else if ($(this).val() == 'DD') {
+    //         $('.pay_mode_cheque').hide();
+    //         $('.pay_mode_ecs').hide();
+    //         $('.pay_mode_dd').show();
+    //         $('.bank_name_row').show();
+    //     } else if ($(this).val() == 'ECS') {
+    //         $('.pay_mode_dd').hide();
+    //         $('.pay_mode_cheque').hide();
+    //         $('.pay_mode_ecs').show();
+    //         $('.bank_name_row').show();
+    //     } else {
+    //         $('.pay_mode_dd').hide();
+    //         $('.pay_mode_cheque').hide();
+    //         $('.pay_mode_ecs').hide();
+    //         $('.bank_name_row').hide();
+    //     }
+    // });
+    <?php if (!isset($post_data_array['del_id'])) { ?>
+    $(document).on('click', "#btn_save", function() {
+        var Current_Field_id = $(this).attr('id');
+        $('#' + Current_Field_id).hide();
+        try {
+            if ($("#brv_serial_no").val().length == '') {
+                throw {
+                    msg: "Enter Serial Number",
+                    foc: "#brv_serial_no"
+                }
+            }
+            if ($("#date").val().length == '') {
+                throw {
+                    msg: "Select Date",
+                    foc: "#date"
+                }
+            }
+            if ($("#chl_date").val().length == '') {
+                throw {
+                    msg: "Select Chalan Collection Date",
+                    foc: "#chl_date"
+                }
+            }
+            if ($("#payment_mode").val().length == '') {
+                throw {
+                    msg: "Payment Mode missing",
+                    foc: "#payment_mode"
+                }
+            }
+            if ($("#credit_total_amount").val().length == '') {
+                throw {
+                    msg: "Enter Credit Amount",
+                    foc: "#credit_amount"
+                }
+            }
+            if ($("#debit_total_amount").val().length == '') {
+                throw {
+                    msg: "Enter Debit Amount",
+                    foc: "#debit_amount"
+                }
+            }
+            if (parseFloat($("#credit_total_amount").val()) != parseFloat($("#debit_total_amount")
+                .val())) {
+                throw {
+                    msg: "Debit Amount And Credit Amount Must Be Same"
+                }
+            }
+            // if ($("#pay_mode").val().length == '') {
+            //     throw {
+            //         msg: "Select Payment Mode",
+            //         foc: "#pay_mode"
+            //     }
+            // } 
+            // else if ($("#pay_mode").val() == 'Cheque') {
+            //     if ($("#cheque_no").val().length == '') {
+            //         throw {
+            //             msg: "Enter Cheque No.",
+            //             foc: "#cheque_no"
+            //         }
+            //     }
+            //     if ($("#cheque_date").val().length == '') {
+            //         throw {
+            //             msg: "Enter Cheque Date",
+            //             foc: "#cheque_date"
+            //         }
+            //     }
+            //     if ($("#bank_name").val().length == '') {
+            //         throw {
+            //             msg: "Enter Bank Name",
+            //             foc: "#bank_name"
+            //         }
+            //     }
+            // }
+            // else if ($("#pay_mode").val() == 'DD') {
+            //     if ($("#dd_no").val().length == '') {
+            //         throw {
+            //             msg: "Enter DD No.",
+            //             foc: "#dd_no"
+            //         }
+            //     }
+            //     if ($("#dd_date").val().length == '') {
+            //         throw {
+            //             msg: "Select DD Date",
+            //             foc: "#dd_date"
+            //         }
+            //     }
+            //     if ($("#bank_name").val().length == '') {
+            //         throw {
+            //             msg: "Enter Bank Name",
+            //             foc: "#bank_name"
+            //         }
+            //     }
+            // }
+            // else if ($("#pay_mode").val() == 'ECS') {
+            //     if ($("#ecs_no").val().length == '') {
+            //         throw {
+            //             msg: "Enter ECS No.",
+            //             foc: "#ecs_no"
+            //         }
+            //     }
+            //     if ($("#ecs_date").val().length == '') {
+            //         throw {
+            //             msg: "Select ECS Date",
+            //             foc: "#ecs_date"
+            //         }
+            //     }
+            //     if ($("#bank_name").val().length == '') {
+            //         throw {
+            //             msg: "Enter Bank Name",
+            //             foc: "#bank_name"
+            //         }
+            //     }
+            // }
+            // if ($("#bank_code").val().length == '') {
+            //     throw {
+            //         msg: "Select Bank Code",
+            //         foc: "#bank_code"
+            //     }
+            // }
+            // if ($("#acc_code").val().length == '') {
+            //     throw {
+            //         msg: "Select Account Code",
+            //         foc: "#acc_code"
+            //     }
+            // }
+            // if ($("#bank_head").val().length == '') {
+            //     throw {
+            //         msg: "Enter Bank Head",
+            //         foc: "#bank_head"
+            //     }
+            // }
+            // if ($("#acc_head").val().length == '') {
+            //     throw {
+            //         msg: "Enter Account Head",
+            //         foc: "#acc_head"
+            //     }
+            // }
+            // if ($("#cash_from_type").val().length == '') {
+            //     throw {
+            //         msg: "Select Cash From Type",
+            //         foc: "#cash_from_type"
+            //     }
+            // }
+            // if ($("#cash_from_type").val() == 'D' && $("#debit_amount").val().length == '') {
+            //     throw {
+            //         msg: "Enter Debit Amount",
+            //         foc: "#debit_amount"
+            //     }
+            // }
+            // if ($("#cash_from_type").val() == 'C' && $("#credit_amount").val().length == '') {
+            //     throw {
+            //         msg: "Enter Credit Amount",
+            //         foc: "#credit_amount"
+            //     }
+            // }                           
+            if ($("#narration").val().length == '') {
+                throw {
+                    msg: "Enter Narration",
+                    foc: "#narration"
+                }
+            }
+            return true;
+        } catch (e) {
+            alert(e.msg);
+            $('#' + Current_Field_id).show();
+            $(e.foc).focus();
+            return false;
+        }
+    });
+    <?php } ?>
+});
+</script>
+<style type="text/css">
+.hidden_field_element_value {
+    display: none;
+}
+
+.gj-datepicker {
+    width: 50%;
+}
+
+table.table-bordered>tbody>tr>td,
+table.table-bordered>tfoot>tr>td {
+    width: 50% !important;
+}
+</style>
+<div class="container mt-3">
+    <form action="" method="post" class="my-3" enctype="multipart/form-data">
+        <input class="form-control  form-control-sm" type="hidden" id="<?php echo htmlentities($this->page_token); ?>"
+            name="<?php echo htmlentities($this->page_token); ?>"
+            value="<?php echo htmlentities($this->token($this->page_token)); ?>">
+        <div class="card">
+            <div class="card-body pl-5 pr-5">
+                <?php
+                        if (isset($post_data_array["STATUS"])) {
+                            echo $this->ShowMessage($post_data_array["STATUS"], $post_data_array["MESSAGE"]);
+                        }
+                        ?>
+                <table class="table table-bordered m-0 p-0 table-striped tndtp_form_table">
+                    <thead class="bg-th-form-dsg">
+                        <tr>
+                            <th align="center" scope="col" colspan="12">Bank Receipt Voucher</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <input type="hidden" id="chalan_nos" name="chalan_nos" >
+                            <td class="text-left font-weight-bold"><span DisplayLabelID="483">Serial No</span></td>
+                            <td scope="col">
+                                <?php 
+                                        $sel_qry="select max(brv_serial_no) as id from accounts_master.t_bank_receipt_voucher where dcode=:dcode and lbcode=:lbcode and del_flag is null  and fin_year=:fin_year;";
+                                        $sel_qry_res=$this->prepare($sel_qry, array(":dcode"=>$dcode, ":lbcode"=>$lbcode, ":fin_year"=>$fin_year),4);
+                                        
+										$get_cur_fin_year="select * from public.sp_fin_year_from_date(current_date);";
+                                        $cur_fin_year=$this->prepare($get_cur_fin_year, array(),4);
+										
+                                         $serial_no=  $sel_qry_res['id'] + 1 . '/' . $fin_year ;
+										  
+										//$serial_no=explode('/',($sel_qry_res['id']))[0]+1;
+										
+                                        $chalan_no=$serial_no;
+                                        echo $chalan_no;
+                                         $del_qry="delete from accounts_master.t_bank_receipt_voucher_breakup   where dcode=:dcode and lbcode=:lbcode and fin_year=:fin_year and brv_serial_no=:brv_serial_no;";
+                                         $del_qry_res=$this->prepare($del_qry, array(":dcode"=>$dcode, ":lbcode"=>$lbcode, ":fin_year"=>$fin_year, ":brv_serial_no"=>$sel_qry_res['id'] + 1),4);
+                                        ?>
+                                <input type="hidden" id="brv_serial_no" name="brv_serial_no"
+                                    class="form-control w-50 form-control-sm"
+                                    value="<?php echo $sel_qry_res['id'] + 1; ?>" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-weight-bold"><span DisplayLabelID="484">BRV Date</span></td>
+                            <td scope="col">
+                                <input type="text" id="date" name="date" value="<?php echo htmlentities(isset($post_data_array['date'])?$post_data_array['date']:''); ?>" class="form-control form-control-sm user_enter_date w-50" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-weight-bold"><span>Chalan Collection Date</span></td>
+                            <td scope="col">
+                                <input type="text" id="chl_date" name="chl_date" value="<?php echo htmlentities(isset($post_data_array['chl_date'])?$post_data_array['chl_date']:''); ?>" class="form-control form-control-sm user_enter_date w-50" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-weight-bold"> <span>Triplicate Chalan collection amount and chalan number</span></td>
+                            <td scope="col">
+                                <span id="span_collection_amount"><?php echo htmlentities(isset($post_data_array['collection_amount'])?$post_data_array['collection_amount']:''); ?></span>
+                                <input type="hidden" id="collection_amount" name="collection_amount" value="<?php echo htmlentities(isset($post_data_array['collection_amount'])?$post_data_array['collection_amount']:''); ?>" class="form-control form-control-sm w-50" />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-left font-weight-bold"><span>Payment Mode</span></td>
+                            <td scope="col">
+                                Cash
+                                <input type="hidden" id="payment_mode" name="payment_mode" value="1"
+                                    class="form-control form-control-sm user_enter_date w-50" />
+                            </td>
+                        </tr>
+                </table><br>
+                <div class="row">
+                                <div class=col-md-6>
+                                    <table class="table table-bordered m-0 p-0 table-striped tndtp_form_table">
+                                        <tr>
+                                            <th align="center" scope="col"
+                                                style="text-align:center;background-color:darkslateblue;color:white"
+                                                colspan="12">Credit</th>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-weight-bold"><span>Account Code & Head</span></td>
+                                            <td scope="col">
+                                                <select id="credit_bank_code" name="credit_bank_code"
+                                                    class="form-control form-control-sm mb-2">
+                                                    <option value="">Choose</option>
+													<?php
+													$query = "
+													SELECT 
+														li.account_headid as account_head_id,
+														acc_head.account_code,
+														acc_head.account_head_name_en
+													FROM 
+													accounts_master.m_accounthead_link as li
+													LEFT JOIN (
+														SELECT 
+															account_head_id,
+															old_account_head_code AS account_code,
+															account_head_name_en
+														FROM 
+															accounts_master.m_account_head
+														WHERE 
+															/*account_type_head_id = :account_type_head_id
+															AND*/ isactive = :isactive
+													) AS acc_head 
+														ON acc_head.account_head_id = li.account_headid
+													WHERE 
+														/*li.lbcode = :lbcode
+														AND li.dcode = :dcode
+														AND */li.voucher_id=:voucher_id
+														 AND li.isactive=1
+														AND li.del_flag is null
+														AND li.account_type_id=:account_type_id
+														AND acc_head.account_head_id IS NOT NULL
+												";
+
+												   /* $res = $this->prepare($query, [
+														":account_type_head_id"=>1,":isactive"=>1,":lbcode"=>$lbcode,":dcode"=>$dcode
+													],2);
+													*/
+													 $res = $this->prepare($query, [
+														":isactive"=>1,":voucher_id"=>8,":account_type_id"=>1
+													],2);
+													foreach ($res as $row): ?>
+														<option value="<?= $row['account_head_id']; ?>"
+																data-code="<?= htmlentities($row['account_code']); ?>"
+																data-name="<?= htmlentities($row['account_head_name_en']); ?>">
+															<?= htmlentities($row['account_code'] . ' - ' . $row['account_head_name_en']); ?>
+														</option>
+													<?php endforeach; ?>
+                                                </select>
+                                                    <script>
+                                                        $(document).ready(function(){
+                                                            $('#credit_bank_code').attr('disabled',true);
+                                                        }
+                                                            )
+                                                        
+                                                    </script>
+
+
+                                                <input type="hidden" id="credit_bank_head" name="credit_bank_head"
+                                                    class="form-control form-control-sm number_field" />
+
+                                            </td>
+                                        </tr>
+
+                                        <tr>
+                                            <td class="text-text-right font-weight-bold"><span
+                                                    DisplayLabelID="483">Amount</span></td>
+                                            <td scope="col">
+                                                <input type="text" id="credit_amount" name="credit_amount"
+                                                    class="form-control form-control-sm number_field" />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-weight-bold" colspan="2" align="center">
+                                                <input type="button" id="btn_credit_add" name="btn_credit_add"
+                                                    value="Add Credit"
+                                                    class="btn btn-md text-white font-weight-bold btn-success" />
+                                                <input type="hidden" id="credit_edit_id" name="credit_edit_id"
+                                                    class="form-control form-control-sm number_field" value="" />
+                                                <input type="hidden" id="credit_delete_id" name="credit_delete_id"
+                                                    class="form-control form-control-sm number_field" value="" />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-weight-bold"><span DisplayLabelID="483">Credit
+                                                    Amount</span></td>
+                                            <td scope="col">
+                                                <span id="span_credit_total_amount"><?php echo htmlentities(isset($post_data_array['credit_amount'])?$post_data_array['credit_amount']:''); ?></span>
+                                                <input type="hidden" id="credit_total_amount" name="credit_total_amount"                         class="form-control form-control-sm number_field" vaalue="<?php echo htmlentities(isset($post_data_array['credit_amount'])?$post_data_array['credit_amount']:''); ?>"/>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2">
+                                                <table id="credit_table_result"
+                                                    class="table table-bordered m-0 p-0 table-striped tndtp_form_table">
+                                                    <thead>
+                                                        <tr>
+                                                            <td> Account Code </td>
+                                                            <td> Account Head </td>
+
+                                                            <td> Amount </td>
+                                                            <td> Edit / Delete </td>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+
+                                                    </tbody>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </table>
+
+                                </div>
+                                  <div class="col-md-6">
+                                    <table class="table table-bordered m-0 p-0 table-striped tndtp_form_table">
+                                        <tr>
+                                            <th align="center" scope="col"
+                                                style="text-align:center;background-color:darkslateblue;color:white"
+                                                colspan="12">Debit</th>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-weight-bold"><span>Account Code & Head</span></td>
+                                            <td scope="col">
+
+                                                <select id="debit_bank_code" name="debit_bank_code"
+                                                    class="form-control form-control-sm mb-2">
+                                                   <option value="">Choose</option>
+													<?php
+													$query = "
+													SELECT 
+														li.account_headid as account_head_id,
+														acc_head.account_code,
+														acc_head.account_head_name_en
+													FROM 
+													accounts_master.m_accounthead_link as li
+													LEFT JOIN (
+														SELECT 
+															account_head_id,
+															old_account_head_code AS account_code,
+															account_head_name_en
+														FROM 
+															accounts_master.m_account_head
+														WHERE 
+															/*account_type_head_id = :account_type_head_id
+															AND*/ isactive = :isactive
+													) AS acc_head 
+														ON acc_head.account_head_id = li.account_headid
+													WHERE 
+														/*li.lbcode = :lbcode
+														AND li.dcode = :dcode
+														AND */li.voucher_id=:voucher_id
+														 AND li.isactive=1
+														AND li.del_flag is null
+														AND li.account_type_id=:account_type_id
+														AND acc_head.account_head_id IS NOT NULL
+												";
+
+												   /* $res = $this->prepare($query, [
+														":account_type_head_id"=>1,":isactive"=>1,":lbcode"=>$lbcode,":dcode"=>$dcode
+													],2);
+													*/
+													 $res = $this->prepare($query, [
+														":isactive"=>1,":voucher_id"=>8,":account_type_id"=>2
+													],2);
+													foreach ($res as $row): ?>
+														<option value="<?= $row['account_head_id']; ?>"
+																data-code="<?= htmlentities($row['account_code']); ?>"
+																data-name="<?= htmlentities($row['account_head_name_en']); ?>">
+															<?= htmlentities($row['account_code'] . ' - ' . $row['account_head_name_en']); ?>
+														</option>
+													<?php endforeach; ?>
+                                                </select>
+
+
+                                                <input type="hidden" id="debit_bank_head" name="debit_bank_head"
+                                                    class="form-control form-control-sm number_field" />
+                                                
+
+
+                                            </td>
+                                        </tr>
+
+
+
+                                        <tr id="debit_current_amount_tr">
+                                            <td class="text-left font-weight-bold"><span DisplayLabelID="483">Amount</span></td>
+                                            <td scope="col">
+                                                <input type="text" id="debit_amount" name="debit_amount"
+                                                    class="form-control form-control-sm number_field" />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-left font-weight-bold" colspan="2" align="center">
+                                                <input type="button" id="btn_debit_add" name="btn_debit_add" value="Add Debit"
+                                                    class="btn btn-md text-white font-weight-bold btn-success" />
+                                                <input type="hidden" name="debit_edit_id" value="" class="bank_id"
+                                                    id="debit_edit_id" />
+                                                <input type="hidden" name="debit_delete_id" value="" class="bank_id"
+                                                    id="debit_delete_id" />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right font-weight-bold"><span DisplayLabelID="483">Debit
+                                                    Amount</span></td>
+                                            <td scope="col">
+                                                <span id="span_debit_total_amount"></span>
+                                                <input type="hidden" id="debit_total_amount" name="debit_total_amount"
+                                                    class="form-control form-control-sm number_field" />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="2">
+                                                <table id="debit_table_result"
+                                                    class="table table-bordered m-0 p-0 table-striped tndtp_form_table">
+                                                    <thead>
+                                                        <tr>
+                                                            <td> Account Code </td>
+                                                            <td> Account Head</td>
+                                                            <td> Amount </td>
+                                                            <td> Edit / Delete </td>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+
+                                                    </tbody>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                <br>
+                <table class="table table-bordered m-0 p-0 table-striped tndtp_form_table">
+                    <tr>
+                        <td align="center">
+                            <span DisplayLabelID="484">Narration</span>
+                        </td>
+                        <td align="left" colspan="2">
+                            <textarea id="narration" name="narration" rows="4" cols="50" class="form-control w-50 form-control-sm"><?php echo htmlentities(isset($post_data_array['narration'])?$post_data_array['narration']:''); ?></textarea>
+                            <span>Max 250 Characters</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td colspan="4" align="center">
+                            <input type="submit" id="btn_save" name="btn_save" value="Save"
+                                class="btn btn-md text-white font-weight-bold  btn-success" />
+                            <input type="button" id="btn_reset" name="btn_reset" value="Cancel"
+                                class="btn btn-md text-white font-weight-bold btn-secondary"
+                                onclick="window.location='Bank_Receipt_Voucher.php'" />
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+</div>
+</form>
+</div>
+<?php
+
+        // #############
+
+        // PAGE CONTENT END
+
+        // #############
+
+        $ob_output_main_contents = ob_get_contents();
+        ob_clean();
+        $this->Template($this->getCurrentUserTemplate() != "" ? $this->getCurrentUserTemplate() : "Template1", "Property Tax - New Assessment", $ob_output_main_contents, array(), array('page_id' => 12));
+    }
+
+    public function data_save($save_data)
+    {
+        //TOKEN VALIDATE
+        if (!$this->validateToken($this->page_token, $save_data[$this->page_token])) {
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => $this->page_token,
+                "MESSAGE" => "Invalid Token"
+            ), $save_data));
+            header("Refresh:0");
+            exit;
+        } else {
+            unset($_SESSION[$this->page_token]);
+        }
+
+        //print_r($save_data);die;
+        $statecode = $this->getCurrentStateCode();
+        $dcode = $this->getCurrentDistrictCode();
+        $lbcode = $this->getCurrentLocalBodyCode();
+
+        if (isset($save_data['brv_serial_no']) && $save_data['brv_serial_no']!='') {
+            $brv_serial_no = $save_data['brv_serial_no'];
+            $brv_serial_no_Validation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'number',
+                    'Field_Value' => $save_data['brv_serial_no'],
+                    'Field_Name' => 'BRV Serial Number',
+                    'Field_Label_Name' => 'BRV Serial Number',
+                )
+            );
+
+            if ($brv_serial_no_Validation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "brv_serial_no",
+                    "MESSAGE" => $brv_serial_no_Validation['Message']
+                ), $save_data));
+                exit;
+            }
+        }else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "brv_serial_no",
+                "MESSAGE" => 'Missing BRV Chalan Number'
+            ), $save_data));
+            exit;
+        }
+        if (isset($save_data['date']) && $save_data['date']!='') {
+            $date = $save_data['date'];
+            list($date_completion, $month_completion, $year_completion) = explode('-', $date);
+            $date = $year_completion . '-' . $month_completion . '-' . $date_completion;
+            $dateValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'date',
+                    'Field_Value' => $save_data['date'],
+                    'Field_Name' => 'date',
+                    'Field_Format' => 'dd-mm-yyyy',
+                    'Field_Label_Name' => 'Invalid Date',
+                )
+            );
+            if ($dateValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "date",
+                    "MESSAGE" => $dateValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }
+        else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "date",
+                "MESSAGE" => 'Select Date'
+            ), $save_data));
+            exit;
+        }
+        if (isset($save_data['chl_date']) && $save_data['chl_date']!='') {
+            $chl_date = $save_data['chl_date'];
+            list($date_completion, $month_completion, $year_completion) = explode('-', $chl_date);
+            $chl_date = $year_completion . '-' . $month_completion . '-' . $date_completion;
+            $chl_dateValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'date',
+                    'Field_Value' => $save_data['chl_date'],
+                    'Field_Name' => 'chl_date',
+                    'Field_Format' => 'dd-mm-yyyy',
+                    'Field_Label_Name' => 'Invalid Date',
+                )
+            );
+            if ($chl_dateValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "chl_date",
+                    "MESSAGE" => $chl_dateValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }
+        else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "chl_date",
+                "MESSAGE" => 'Select Chalan Collection Date'
+            ), $save_data));
+            exit;
+        }
+        if (isset($save_data['payment_mode']) && $save_data['payment_mode']!='') {
+            $payment_mode = $save_data['payment_mode'];
+            $payment_modeValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'number',
+                    'Field_Value' => $payment_mode,
+                    'Field_Name' => 'payment_mode',
+                    'Field_Max_length' => '2',
+                    'Field_Label_Name' => 'Invalid Payment Mode',
+                )
+            );
+            if ($payment_modeValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "payment_mode",
+                    "MESSAGE" => $payment_modeValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "payment_mode",
+                "MESSAGE" => 'Missing Payment Mode'
+            ), $save_data));
+            exit;
+        }
+        if (isset($save_data['debit_total_amount']) && $save_data['debit_total_amount']!='') {
+            $debit_amount = $save_data['debit_total_amount'];
+            $debit_amountValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'float',
+                    'Field_Value' => $debit_amount,
+                    'Field_Name' => 'debit_amount',
+                    'Field_Label_Name' => 'Invalid Debit Amount',
+                )
+            );
+            if ($debit_amountValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "debit_amount",
+                    "MESSAGE" => $debit_amountValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "debit_amount",
+                "MESSAGE" => 'Enter Debit Amount'
+            ), $save_data));
+            exit;
+        }
+        if (isset($save_data['credit_total_amount']) && $save_data['credit_total_amount']!='') {
+            $credit_amount = $save_data['credit_total_amount'];
+            $credit_amountValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'float',
+                    'Field_Value' => $credit_amount,
+                    'Field_Name' => 'credit_amount',
+                    'Field_Label_Name' => 'Invalid Credit Amount',
+                )
+            );
+            if ($credit_amountValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "credit_amount",
+                    "MESSAGE" => $credit_amountValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "credit_amount",
+                "MESSAGE" => 'Enter Credit Amount'
+            ), $save_data));
+            exit;
+        }
+        if (isset($save_data['narration']) && $save_data['narration']!='') {
+            $narration = $save_data['narration'];
+            $narrationValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'text_space',
+                    'Field_Value' => $narration,
+                    'Field_Name' => 'Narration',
+                    'Field_Max_length' => '300',
+                    'Field_Label_Name' => 'Narration',
+                )
+            );
+            if ($narrationValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "Narration",
+                    "MESSAGE" => $narrationValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "Narration",
+                "MESSAGE" => 'Enter Narration'
+            ), $save_data));
+            exit;
+        }
+        $collection_amount = $save_data['collection_amount'];
+        /*
+        if (isset($save_data['collection_amount']) && $save_data['collection_amount']!='') {
+            //print_r($collection_amount);die();
+            $collection_amountValidation = $this->Field_Validation(
+                array(
+                    'Field_Type' => 'float',
+                    'Field_Value' => $collection_amount,
+                    'Field_Name' => 'collection_amount',
+                    'Field_Label_Name' => 'Collection Amount',
+                )
+            );
+            if ($collection_amountValidation['Status'] == "Error") {
+                $this->main_content(array_merge(array(
+                    "STATUS" => "ERROR",
+                    "STATUS_TYPE" => "FIELD",
+                    "FIELD_NAME" => "collection_amount",
+                    "MESSAGE" => $collection_amountValidation['Message']
+                ), $save_data));
+                exit;
+            }
+        }else{
+            $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "FIELD_NAME" => "collection_amount",
+                "MESSAGE" => 'Enter Collection Amount'
+            ), $save_data));
+            exit;
+        }*/
+        if($credit_amount != $debit_amount){
+             $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "MESSAGE" => 'Debit Amount And Credit Amount Must Be Same'
+            ), $save_data));
+            exit;
+        }
+        if($credit_amount!=$collection_amount || $debit_amount!=$collection_amount)
+        {
+             $this->main_content(array_merge(array(
+                "STATUS" => "ERROR",
+                "STATUS_TYPE" => "FIELD",
+                "MESSAGE" => 'Debit and Credit amount must be same as Collection amount'
+            ), $save_data));
+            exit;
+        }
+        $chalanNos = json_decode($_POST['chalan_nos'], true);
+        //print_r($chalanNos);die;
+        $inClause = '(' . implode(',', array_map('intval', $chalanNos)) . ')';
+       // print_r($placeholders);die;
+        $fin_year=$this->getFinYear();
+        //$fin_year='2025-2026';
+        $Result_Message = "Data Saved SuccessFully";
+        $site_data = $this->siteData();
+        $this->beginTransaction();
+        $sp_bank_receicpt_voucher = "accounts_master.sp_bank_receicpt_voucher";
+        $user_name = $this->getCurrentUser();
+        $ip_address = $this->getIpAddress();  
+         $brv_chalan_no=$brv_serial_no. '/' . $fin_year;     
+        $save_query = "select * from " . $sp_bank_receicpt_voucher . "(:dcode, :lbcode, :brv_chalan_no,:brv_serial_no, :brv_date, :payment_mode, :triplicate_collection_date,:debit_amount, :credit_amount, :total_amount, :narration, :fin_year, :user_name, :ip_address, :edit_id, :del_id)";
+        $res1 = $this->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":brv_chalan_no" => $brv_chalan_no, ":brv_serial_no" => $brv_serial_no, ":brv_date" => $date, ":triplicate_collection_date" => $chl_date, ":fin_year" => $fin_year, ":debit_amount" => $debit_amount, ":credit_amount" => $credit_amount, ":total_amount" => $collection_amount, ":narration" => $narration, ":payment_mode"=>$payment_mode, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => 0, ":del_id" => 0), 4);
+        //print_r($res1);die;
+        
+        if (!isset($res1->errorInfo)) {
+            try{
+
+                $latest_date_query = "update accounts_master.t_triplicate_chalan_details set brv_id=:brv_id   WHERE del_flag IS NULL and tc_serial_no IN $inClause and dcode=:dcode and lbcode=:lbcode and fin_year=:fin_year";
+                $sel_dname_res = $this->prepare($latest_date_query, array(":brv_id" => $res1['sp_bank_receicpt_voucher'], ":dcode" => $dcode, ":lbcode" => $lbcode,":fin_year"=>$fin_year), 4);
+
+                $account_head_balance= new Account_head_balance();
+                $account_head_balance->update_bank_receipt_voucher_head_amount($brv_serial_no,false);
+                $this->commit();
+            }
+            catch (PDOException $e)
+            {
+                $this->rollBack();
+                $this->main_content(array(
+                    "STATUS" => "FAIL",
+                    "STATUS_TYPE" => "FORM",
+                    "MESSAGE" => "Data Save Failed Due To Duplicate Entry"
+                ));
+                exit;
+            }
+            $url = $site_data->website_url . '/project/forms/masters/Bank_Receipt_Voucher_Receipt.php?id=' . base64_encode($res1['sp_bank_receicpt_voucher']);
+            // Redirect to the next page
+            header("Location: $url");
+            exit; 
+        } else {
+            $this->rollback();
+            $this->main_content(array(
+                "STATUS" => "FAIL",
+                "STATUS_TYPE" => "FORM",
+                "MESSAGE" => "Data Save Failed Due To Duplicate Entry"
+            ));
+            exit;
+        }
+
+       
+    }
+
+
+       
+    
+}
+$AdjustBankReceiptVoucher = new AdjustBankReceiptVoucher();
+if (!isset($_POST['cmd'])) {
+    if (isset($_POST['btn_save']) && $_POST['btn_save'] != '') {
+        $AdjustBankReceiptVoucher->data_save(array_merge($_POST, $_GET));
+    } else {
+        $AdjustBankReceiptVoucher->main_content(array_merge(array("mode_name" => "Save", "mode_class" => "btn-primary"), $_GET));
+    }
+} else if (isset($_POST['cmd'])) {
+    $cmd = base64_decode($_POST['cmd']);
+    if ($cmd == 2) {
+        $bank_code = base64_decode($_POST['bank_code']);
+        $dcode = $AdjustBankReceiptVoucher->getCurrentDistrictCode();
+        $lbcode = $AdjustBankReceiptVoucher->getCurrentLocalBodyCode();
+		$sel_qry = "select b.bank_code as bank_code,b.bank_name_en as bank_name, account_no, ifsc_code, fundname from (select bank_id, bank_code, bankbranch_id, account_no, fund_id, ifsc_code from accounts_master.t_bank_account where del_flag is null and isactive = :isactive and bankaccount_id=:bank_code and dcode=:dcode and lbcode=:lbcode) a left join 
+        (select bank_id, bank_name_en, bank_code from accounts_master.m_bank) as b on a.bank_id=b.bank_id
+        left join 
+        accounts_master.m_fund as e on a.fund_id=e.fundid;";		
+		$sel_qry_res=$AdjustBankReceiptVoucher->prepare($sel_qry,array(":bank_code"=>$bank_code, ":dcode"=>$dcode, ":lbcode"=>$lbcode, ":isactive"=>1),4);
+        //print_r($sel_qry_res);die();
+        $Result['STATUS'] = 'SUCCESS';
+        $Result['DATA'] = $sel_qry_res['bank_name'] .' - '. $sel_qry_res['account_no'];
+        echo json_encode($Result);
+        exit;}
+    if ($cmd == 3) {
+        $collection_amount = base64_decode($_POST['collection_amount']);
+        $brv_serial_no = base64_decode($_POST['brv_serial_no']);
+		//print_r($brv_serial_no);die;
+        $acc_code = base64_decode($_POST['acc_code']);
+        $acc_head = base64_decode($_POST['acc_head']);        
+        $debit_edit_id = isset($_POST['edit_id']) && $_POST['edit_id']!=''?base64_decode($_POST['edit_id']):0;
+        $debit_delete_id = isset($_POST['delete_id']) && $_POST['delete_id']!=''?base64_decode($_POST['delete_id']):0;
+        $amount = base64_decode($_POST['amount']);
+        $dcode = $AdjustBankReceiptVoucher->getCurrentDistrictCode();
+        $lbcode = $AdjustBankReceiptVoucher->getCurrentLocalBodyCode();
+        $user_name = $AdjustBankReceiptVoucher->getCurrentUser();
+        $ip_address = $AdjustBankReceiptVoucher->getIpAddress();
+        $fin_year = $AdjustBankReceiptVoucher->getFinYear();
+        $AdjustBankReceiptVoucher->beginTransaction();
+        if($debit_delete_id == 0 && $debit_edit_id == 0){
+            $save_query = "select * from accounts_master.sp_bank_receipt_voucher_breakup(:dcode, :lbcode, :account_type,:acc_code, :acc_head, :debit_amount, :credit_amount, :fin_year, :brv_serial_no, :user_name, :ip_address, :edit_id, :del_id)";
+            $res1 = $AdjustBankReceiptVoucher->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":account_type" => 1, ":acc_code" => $acc_code, ":acc_head" => $acc_head, ":debit_amount" => $amount, ":credit_amount"=>NULL, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => $debit_edit_id, ":del_id" => $debit_delete_id, ":fin_year"=>$fin_year, ":brv_serial_no" =>$brv_serial_no),4);
+        }else if($debit_delete_id == 0 && $debit_edit_id != 0){
+            $save_query = "select * from accounts_master.sp_bank_receipt_voucher_breakup(:dcode, :lbcode, :account_type,:acc_code, :acc_head, :debit_amount, :credit_amount, :fin_year, :brv_serial_no, :user_name, :ip_address, :edit_id, :del_id)";
+            $res1 = $AdjustBankReceiptVoucher->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":account_type" => 1, ":acc_code" => $acc_code, ":acc_head" => $acc_head, ":debit_amount" => $amount, ":credit_amount"=>NULL, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => $debit_edit_id, ":del_id" => $debit_delete_id, ":fin_year"=>$fin_year, ":brv_serial_no" =>$brv_serial_no),4);
+        }  if($debit_delete_id != 0 && $debit_edit_id == 0){
+            $save_query = "select * from accounts_master.sp_bank_receipt_voucher_breakup(:dcode, :lbcode, :account_type,:acc_code, :acc_head, :debit_amount, :credit_amount, :fin_year, :brv_serial_no, :user_name, :ip_address, :edit_id, :del_id)";
+            $res1 = $AdjustBankReceiptVoucher->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":account_type" => 1, ":acc_code" => $acc_code, ":acc_head" => $acc_head, ":debit_amount" => $amount, ":credit_amount"=>NULL, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => $debit_edit_id, ":del_id" => $debit_delete_id, ":fin_year"=>$fin_year, ":brv_serial_no" =>$brv_serial_no),4);
+        }
+       
+
+		$sel_qry = "
+    SELECT 
+        brv_breakup_id,
+        a.acc_head,
+        debit_amount,
+        b.acc_code
+    FROM 
+        (
+            SELECT 
+                brv_breakup_id,
+                acc_code_id,
+                acc_head,
+                debit_amount
+            FROM accounts_master.t_bank_receipt_voucher_breakup
+            WHERE 
+                dcode = :dcode
+                AND lbcode = :lbcode
+                AND isactive = :isactive
+                AND del_flag IS NULL
+                AND brv_serial_no = :brv_serial_no
+                AND account_type = :account_type
+                AND fin_year = :fin_year
+        ) a
+    LEFT JOIN 
+        (
+            SELECT 
+                old_account_head_code AS acc_code,
+                account_head_id from accounts_master.m_account_head
+        ) b 
+        ON a.acc_code_id = b.account_head_id
+";
+
+		$sel_qry_res=$AdjustBankReceiptVoucher->prepare($sel_qry,array( ":dcode"=>$dcode, ":lbcode"=>$lbcode, ":isactive"=>1, ":brv_serial_no"=>$brv_serial_no, ":account_type"=>1, ":fin_year"=>$fin_year),return_array_type: 2);
+        //print_r($sel_qry_res);die;
+        ob_start();
+        foreach($sel_qry_res as $sel_qry_row){
+            ?>
+<tr>
+    <td><?php echo htmlentities($sel_qry_row['acc_code']); ?></td>
+    <td><?php echo htmlentities($sel_qry_row['acc_head']); ?></td>
+    <td><?php echo htmlentities($sel_qry_row['debit_amount']); ?>
+        <input type="hidden" name="debit_bank_id" value="<?php echo htmlentities($sel_qry_row['brv_breakup_id']);?>"
+            class="bank_id" />
+    </td>
+    <td>
+        <input type="button" id="btn_debit_edit" name="btn_debit_edit" value="Edit"
+            class="btn btn-md text-white font-weight-bold btn-success" style="font-size: small;">
+        <br />
+        <input type="button" id="btn_debit_delete" name="btn_debit_delete" value="Delete"
+            class="btn btn-md text-white font-weight-bold btn-danger" style="font-size: small;">
+    </td>
+</tr>
+<?php
+        }
+        $debit_amount = array_sum(array_column($sel_qry_res, 'debit_amount'));
+        /*print_r($collection_amount);
+        echo '<pre>';
+        print_r($debit_amount);
+        */
+        if(($debit_delete_id == 0 && $debit_edit_id == 0)||($debit_delete_id == 0 && $debit_edit_id != 0))
+        {
+        
+        if( $debit_amount>$collection_amount){
+            $ob_contents = ob_get_contents();
+            ob_clean();
+            $AdjustBankReceiptVoucher->rollback();
+            $Result_Data['STATUS']='ERROR';
+            $Result_Data['MESSAGE']='Total Debit Amounts Must be Less Than or Equal to Collection Amount';
+        }else{
+            $ob_contents = ob_get_contents();
+		    ob_clean();
+            $AdjustBankReceiptVoucher->commit();
+		    $Result_Data['STATUS']='SUCCESS';
+		    $Result_Data['debit_data_table']=$ob_contents;
+            $Result_Data['debit_amount'] = $debit_amount;
+        }
+        }
+        else{
+            $ob_contents = ob_get_contents();
+		    ob_clean();
+            $AdjustBankReceiptVoucher->commit();
+		    $Result_Data['STATUS']='SUCCESS';
+		    $Result_Data['debit_data_table']=$ob_contents;
+            $Result_Data['debit_amount'] = '';
+        }
+        
+        echo json_encode($Result_Data);
+        exit;
+    }
+    if ($cmd == 4) {
+        $Result=array();
+        $id = base64_decode($_POST['id']);
+        $pay_type=base64_decode($_POST['pay_type']);
+        $account_type = base64_decode($_POST['account_type']);
+        $dcode = $AdjustBankReceiptVoucher->getCurrentDistrictCode();
+        $lbcode = $AdjustBankReceiptVoucher->getCurrentLocalBodyCode();
+        
+
+        $sel_qry = "select brv_breakup_id, acc_code_id, acc_head, debit_amount, credit_amount from accounts_master.t_bank_receipt_voucher_breakup where dcode=:dcode and lbcode=:lbcode and isactive=:isactive and del_flag is null and account_type=:account_type and brv_breakup_id=:brv_breakup_id";		
+		$sel_qry_res=$AdjustBankReceiptVoucher->prepare($sel_qry,array( ":dcode"=>$dcode, ":lbcode"=>$lbcode, ":isactive"=>1, ":account_type"=>$account_type, ":brv_breakup_id"=>$id),4);
+        $Result['STATUS'] = 'SUCCESS';
+        $Result['acc_code'] = $sel_qry_res['acc_code_id'];
+        $Result['acc_head'] = $sel_qry_res['acc_head'];
+        $Result['debit_amount'] = $sel_qry_res['debit_amount'];  
+        $Result['credit_amount'] = $sel_qry_res['credit_amount'];         
+        $Result['brv_breakup_id'] = $sel_qry_res['brv_breakup_id'];
+        
+        echo json_encode($Result);
+        
+        exit;
+    }
+    if ($cmd == 5) {
+        $Result=array();
+        $id = base64_decode($_POST['id']);
+        $account_type = base64_decode($_POST['account_type']);
+        $dcode = $AdjustBankReceiptVoucher->getCurrentDistrictCode();
+        $lbcode = $AdjustBankReceiptVoucher->getCurrentLocalBodyCode();
+        $pay_type=base64_decode($_POST['pay_type']);
+        //print_r($_POST);die();
+
+            $sel_qry = "select brv_breakup_id, acc_code_id, acc_head, debit_amount, credit_amount from accounts_master.t_bank_receipt_voucher_breakup where dcode=:dcode and lbcode=:lbcode and isactive=:isactive and del_flag is null and account_type=:account_type and brv_breakup_id=:brv_breakup_id";		
+		$sel_qry_res=$AdjustBankReceiptVoucher->prepare($sel_qry,array( ":dcode"=>$dcode, ":lbcode"=>$lbcode, ":isactive"=>1, ":account_type"=>$account_type, ":brv_breakup_id"=>$id),4);
+        $Result['STATUS'] = 'SUCCESS';
+        $Result['acc_code'] = $sel_qry_res['acc_code_id'];
+        $Result['acc_head'] = $sel_qry_res['acc_head'];
+        $Result['debit_amount'] = $sel_qry_res['debit_amount'];  
+        $Result['credit_amount'] = $sel_qry_res['credit_amount'];         
+        $Result['brv_breakup_id'] = $sel_qry_res['brv_breakup_id'];
+        echo json_encode($Result);
+        exit;
+    }
+    if ($cmd == 6) {
+        $collection_amount = base64_decode($_POST['collection_amount']);
+        $brv_serial_no = base64_decode($_POST['brv_serial_no']);
+        $acc_code = base64_decode($_POST['acc_code']); 
+        $acc_head = base64_decode($_POST['acc_head']);   
+        $credit_edit_id = isset($_POST['edit_id']) && $_POST['edit_id']!=''?base64_decode($_POST['edit_id']):0;
+        $credit_delete_id = isset($_POST['delete_id']) && $_POST['delete_id']!=''?base64_decode($_POST['delete_id']):0;
+        $amount = base64_decode($_POST['amount']);
+        $dcode = $AdjustBankReceiptVoucher->getCurrentDistrictCode();
+        $lbcode = $AdjustBankReceiptVoucher->getCurrentLocalBodyCode();
+        $user_name = $AdjustBankReceiptVoucher->getCurrentUser();
+        $ip_address = $AdjustBankReceiptVoucher->getIpAddress();
+        $fin_year = $AdjustBankReceiptVoucher->getFinYear();
+        
+        $AdjustBankReceiptVoucher->beginTransaction();
+        if($credit_delete_id == 0 && $credit_edit_id == 0){
+            $save_query = "select * from accounts_master.sp_bank_receipt_voucher_breakup(:dcode, :lbcode, :account_type, :acc_code, :acc_head, :debit_amount, :credit_amount, :fin_year, :brv_serial_no, :user_name, :ip_address, :edit_id, :del_id)";
+            $res1 = $AdjustBankReceiptVoucher->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":account_type" => 2, ":acc_code" => $acc_code, ":acc_head" => $acc_head, ":debit_amount" => NULL, ":credit_amount"=> $amount, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => $credit_edit_id, ":del_id" => $credit_delete_id, ":fin_year"=>$fin_year, ":brv_serial_no" =>$brv_serial_no),4);
+        }else if($credit_delete_id == 0 && $credit_edit_id != 0){
+            $save_query = "select * from accounts_master.sp_bank_receipt_voucher_breakup(:dcode, :lbcode, :account_type, :acc_code, :acc_head, :debit_amount, :credit_amount, :fin_year, :brv_serial_no, :user_name, :ip_address, :edit_id, :del_id)";
+            $res1 = $AdjustBankReceiptVoucher->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":account_type" => 2, ":acc_code" => $acc_code, ":acc_head" => $acc_head, ":debit_amount" => NULL, ":credit_amount"=>$amount, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => $credit_edit_id, ":del_id" => $credit_delete_id, ":fin_year"=>$fin_year, ":brv_serial_no" =>$brv_serial_no),4);
+        }  if($credit_delete_id != 0 && $credit_edit_id == 0){
+            $save_query = "select * from accounts_master.sp_bank_receipt_voucher_breakup(:dcode, :lbcode, :account_type, :acc_code, :acc_head, :debit_amount, :credit_amount, :fin_year, :brv_serial_no, :user_name, :ip_address, :edit_id, :del_id)";
+            $res1 = $AdjustBankReceiptVoucher->prepare($save_query, array(":dcode" => $dcode, ":lbcode" => $lbcode, ":account_type" => 2, ":acc_code" => $acc_code, ":acc_head" => $acc_head, ":debit_amount" => NULL, ":credit_amount"=>$amount, ":user_name" => $user_name, ":ip_address" => $ip_address, ":edit_id" => $credit_edit_id, ":del_id" => $credit_delete_id, ":fin_year"=>$fin_year, ":brv_serial_no" =>$brv_serial_no),4);
+        }
+		$sel_qry = "select brv_breakup_id, old_account_head_code, acc_head, credit_amount from (select brv_breakup_id, acc_code_id, acc_head, credit_amount from accounts_master.t_bank_receipt_voucher_breakup where dcode=:dcode and lbcode=:lbcode and isactive=:isactive and del_flag is null and brv_serial_no=:brv_serial_no  and account_type=:account_type and fin_year=:fin_year)a left join (select account_head_id, old_account_head_code from accounts_master.m_account_head where del_flag is null)b on a.acc_code_id=b.account_head_id;";		
+		$sel_qry_res=$AdjustBankReceiptVoucher->prepare($sel_qry,array( ":dcode"=>$dcode,  ":lbcode"=>$lbcode, ":isactive"=>1, ":brv_serial_no"=>$brv_serial_no, ":account_type"=>2, ":fin_year"=>$fin_year),2);
+        ob_start();
+        foreach($sel_qry_res as $sel_qry_row){
+            ?>
+
+<tr>
+    <td><?php echo htmlentities($sel_qry_row['old_account_head_code']); ?></td>
+    <td><?php echo htmlentities($sel_qry_row['acc_head']); ?></td>
+    <td><?php echo htmlentities($sel_qry_row['credit_amount']); ?>
+        <input type="hidden" name="credit_bank_id" value="<?php echo htmlentities($sel_qry_row['brv_breakup_id']);?>"
+            class="bank_id" />
+    </td>
+    <td>
+        <input type="button" id="btn_credit_edit" name="btn_credit_edit" value="Edit"
+            class="btn btn-md text-white font-weight-bold btn-success" style="font-size: small;">
+        <br />
+        <input type="button" id="btn_credit_delete" name="btn_credit_delete" value="Delete"
+            class="btn btn-md text-white font-weight-bold btn-danger" style="font-size: small;">
+    </td>
+</tr>
+<?php
+        }
+        $credit_amount = array_sum(array_column($sel_qry_res, 'credit_amount'));
+        $ob_contents = ob_get_contents();
+		ob_clean();
+        if(floatval($collection_amount) <  floatval($credit_amount)){
+            $ob_contents = ob_get_contents();
+            ob_clean();
+            $AdjustBankReceiptVoucher->rollback();
+            $Result_Data['STATUS']='ERROR';
+            $Result_Data['MESSAGE']='Chalan Collection Amount Must be Less Than Total Credit Amount';
+        }else{
+            $AdjustBankReceiptVoucher->commit();
+            $Result_Data['STATUS']='SUCCESS';
+            $Result_Data['credit_data_table']=$ob_contents;
+            $Result_Data['credit_amount'] = $credit_amount;
+        }
+        echo json_encode($Result_Data);
+        exit;
+    }
+    if ($cmd == 7) {
+        $chl_date = base64_decode($_POST['chl_date']);
+        $dcode = $AdjustBankReceiptVoucher->getCurrentDistrictCode();
+        $lbcode = $AdjustBankReceiptVoucher->getCurrentLocalBodyCode();
+        //$save_query = "select sum(amount) as total_amount from accounts_master.t_triplicate_chalan_details where dcode=:dcode and lbcode=:lbcode and del_flag is null and isactive=:isactive and TO_CHAR(chalan_date, 'DD-MM-YYYY')=:chalan_date";
+        $save_query = "select sum(total_amount) as total_amount from accounts_master.t_triplicate_chalan_details where dcode=:dcode and lbcode=:lbcode and del_flag is null and isactive=:isactive and chalan_date=:chalan_date and paymentmode=:paymentmode";
+        $params=array(":dcode" => $dcode, ":lbcode" => $lbcode, ":chalan_date" => $chl_date, ":isactive" => 1,":paymentmode"=>1); 
+        $res1 = $AdjustBankReceiptVoucher->prepare($save_query,$params,4);
+
+        $query="select tc_serial_no,tc_chalan_no,
+                total_amount,
+                narration,remitter_name,p.paymenttype as paymentmode
+                from accounts_master.t_triplicate_chalan_details as t
+                left join master.m_paymenttype as p on p.paymenttypeid=t.paymentmode
+                where t.dcode=:dcode and
+                t.paymentmode=:paymentmode and  
+                t.lbcode=:lbcode and 
+                t.del_flag is null and 
+                t.isactive=:isactive and 
+                t.chalan_date=:chalan_date and 
+                p.del_flag is null";
+        $res2= $AdjustBankReceiptVoucher->prepare($query,$params,2);
+        
+        ob_start();
+?>
+
+<div class="modal fade" id="infoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            
+            <div class="modal-header">
+                <h5 class="modal-title">Triplicate Chalan Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body" style="max-height:70vh; overflow-y:auto;">
+                <table class="table table-bordered table-striped tndtp_form_table m-0">
+                    <thead>
+                        <tr>
+                            <th class="text-center text-light" style="background-color:darkslateblue;">Chalan No</th>
+                            <th class="text-center text-light" style="background-color:darkslateblue;">Amount</th>
+                            <th class="text-center text-light" style="background-color:darkslateblue;">Payment Mode</th>
+                            <th class="text-center text-light" style="background-color:darkslateblue;">Remitter Name</th>
+                            <th class="text-center text-light" style="background-color:darkslateblue;">Narration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($res2 as $row): ?>
+                            <tr>
+                                <td class="fw-bold"><?php echo htmlspecialchars($row['tc_chalan_no']); ?></td>
+                                <td class="fw-bold"><?php echo htmlspecialchars($row['total_amount']); ?></td>
+                                <td class="fw-bold"><?php echo htmlspecialchars($row['paymentmode']); ?></td>
+                                <td class="fw-bold"><?php echo htmlspecialchars($row['remitter_name']); ?></td>
+                                <td class="fw-bold"><?php echo htmlspecialchars($row['narration']); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<?php
+$html = ob_get_clean();
+
+        echo json_encode(['total_amount'=>$res1['total_amount'],"html"=>$html,'tc_serial_no' => array_column($res2, 'tc_serial_no')]);
+    
+        exit;
+    }
+
+}
+
+?>
